@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 import 'package:mobileprogramming_p12/model/Product.dart';
 import 'package:mobileprogramming_p12/produk/add_product.dart';
 import 'package:mobileprogramming_p12/service/api_service.dart';
@@ -15,56 +14,87 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  late Product _product;
+  late Product _currentProduct;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _product = widget.product;
+    _currentProduct = widget.product;
   }
 
-  String _formatPrice(int price) {
-    return NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    ).format(price);
-  }
-
-  Future<void> _reduceStock() async {
+  Future<void> _refreshProductDetails() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final updated = await ApiService.reduceStock(_product.id, 1);
+      final updatedProduct = await ApiService.getProductById(_currentProduct.id);
       setState(() {
-        _product = updated;
+        _currentProduct = updatedProduct;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui data: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _deleteProduct() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Produk'),
+        content: Text('Apakah Anda yakin ingin menghapus "${_currentProduct.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoading = true;
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Stok berhasil dikurangi'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal mengurangi stok: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      try {
+        await ApiService.deleteProduct(_currentProduct.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Produk berhasil dihapus'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gagal menghapus produk: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -77,114 +107,144 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddProductScreen(product: _product),
-                ),
-              );
-              if (result == true) {
-                Navigator.pop(context, true);
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'edit') {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddProductScreen(product: _currentProduct),
+                  ),
+                );
+                if (result == true) {
+                  _refreshProductDetails();
+                }
+              } else if (value == 'delete') {
+                _deleteProduct();
               }
             },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Hapus'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _product.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: _product.imageUrl,
-                    height: 250,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      height: 250,
-                      color: Colors.grey[200],
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 250,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.broken_image, size: 60, color: Colors.grey),
-                    ),
-                  )
-                : Container(
-                    height: 250,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
-                  ),
-            Padding(
-              padding: const EdgeInsets.all(16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _product.name,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _formatPrice(_product.price),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.green,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.inventory, size: 18, color: _product.stockColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        _product.stockStatus,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: _product.stockColor,
-                          fontWeight: FontWeight.w500,
+                  _buildProductImage(),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentProduct.name,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Deskripsi',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _product.descriptions,
-                    style: const TextStyle(fontSize: 14, height: 1.5),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: (_product.stock > 0 && !_isLoading) ? _reduceStock : null,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.remove_shopping_cart),
-                    label: const Text('Kurangi Stok (Beli 1)'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentProduct.formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _currentProduct.stockColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _currentProduct.stockStatus,
+                            style: TextStyle(
+                              color: _currentProduct.stockColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 32),
+                        const Text(
+                          'Deskripsi Produk',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _currentProduct.descriptions,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
+  }
+
+  Widget _buildProductImage() {
+    if (_currentProduct.imageUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: _currentProduct.imageUrl,
+        height: 300,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          height: 300,
+          color: Colors.grey[200],
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) => Container(
+          height: 300,
+          color: Colors.grey[200],
+          child: const Center(
+            child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+          ),
+        ),
+      );
+    } else {
+      return Container(
+        height: 300,
+        width: double.infinity,
+        color: Colors.grey[200],
+        child: const Center(
+          child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+        ),
+      );
+    }
   }
 }

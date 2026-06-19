@@ -94,7 +94,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
       try {
         await ApiService.deleteProduct(product.id);
-
         setState(() {
           _products.removeWhere((p) => p.id == product.id);
         });
@@ -116,7 +115,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             SnackBar(
               content: Text('Gagal menghapus: $e'),
               backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
+              duration: Duration(seconds: 3),
             ),
           );
         }
@@ -180,8 +179,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
             _fetchProducts();
           }
         },
-        child: const Icon(Icons.add),
         tooltip: 'Tambah Produk',
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -205,19 +204,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+            Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
             Text(
               'Terjadi Kesalahan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red[700]),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
             ),
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
-                _errorMessage!,
+                'Gagal menyambungkan ke server',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(color: Colors.grey),
               ),
             ),
             const SizedBox(height: 24),
@@ -225,9 +224,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
               onPressed: _fetchProducts,
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
             ),
           ],
         ),
@@ -235,20 +231,20 @@ class _ProductListScreenState extends State<ProductListScreen> {
     }
 
     if (_products.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[400]),
+            Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               'Belum Ada Produk',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 8),
             Text(
               'Tekan tombol + untuk menambah produk',
-              style: TextStyle(color: Colors.grey[500]),
+              style: TextStyle(color: Colors.grey),
             ),
           ],
         ),
@@ -394,7 +390,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Widget _buildProductImage(Product product) {
-    if (product.imageUrl != null && product.imageUrl.isNotEmpty) {
+    if (product.imageUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: CachedNetworkImage(
@@ -424,15 +420,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
               color: Colors.grey[200],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Column(
+            child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.broken_image, size: 30, color: Colors.grey[400]),
+                Icon(Icons.broken_image, size: 30, color: Colors.grey),
                 const SizedBox(height: 4),
-                Text(
-                  'Error',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                ),
+                Text('Error', style: TextStyle(fontSize: 10, color: Colors.grey)),
               ],
             ),
           ),
@@ -446,15 +439,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.image_not_supported, size: 35, color: Colors.grey[400]),
+            Icon(Icons.image_not_supported, size: 35, color: Colors.grey),
             const SizedBox(height: 4),
-            Text(
-              'No image',
-              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-            ),
+            Text('No image', style: TextStyle(fontSize: 10, color: Colors.grey)),
           ],
         ),
       );

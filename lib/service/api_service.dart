@@ -7,27 +7,30 @@ import 'package:http_parser/http_parser.dart';
 import '../model/Product.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  static const String storageUrl = 'http://127.0.0.1:8000/storage';
+  static const String baseUrl = 'http://10.19.75.224/rest-api/public/api';
+  static const String storageUrl = 'http://10.19.75.224/rest-api/public/storage';
 
   static String getImageUrl(String? imagePath) {
     if (imagePath == null || imagePath.isEmpty) return '';
-
+    
     String cleanPath = imagePath;
-
     if (cleanPath.startsWith('public/')) {
       cleanPath = cleanPath.substring(7);
     }
-
+    
     while (cleanPath.contains('products/products/')) {
-      cleanPath = cleanPath.replaceAll('products/products/', 'products/');
+      cleanPath = cleanPath.replaceAll('products/', 'products/');
     }
-
+    
+    print('Cleaning image path:');
+    print('  Original: $imagePath');
+    print('  Cleaned: $cleanPath');
+    print('  Final Url: ${storageUrl}$cleanPath');
+    
     String base = storageUrl.endsWith('/') ? storageUrl : '$storageUrl/';
     String path = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
-
+    
     final String finalUrl = base + path;
-
     return finalUrl;
   }
 
@@ -38,28 +41,40 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 30));
 
+      print('Status Code: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-
+        
         if (decoded is List) {
+          print('Response adalah List dengan ${decoded.length} item');
           return decoded.map((json) => Product.fromJson(json)).toList();
-        } else if (decoded is Map<String, dynamic>) {
+        } 
+        else if (decoded is Map<String, dynamic>) {
+          print('Response adalah Map dengan keys: ${decoded.keys}');
+          
           if (decoded.containsKey('data') && decoded['data'] is List) {
             return (decoded['data'] as List)
                 .map((json) => Product.fromJson(json))
                 .toList();
-          } else if (decoded.containsKey('products') && decoded['products'] is List) {
+          }
+          else if (decoded.containsKey('products') && decoded['products'] is List) {
             return (decoded['products'] as List)
                 .map((json) => Product.fromJson(json))
                 .toList();
-          } else if (decoded.containsKey('result') && decoded['result'] is List) {
+          }
+          else if (decoded.containsKey('result') && decoded['result'] is List) {
             return (decoded['result'] as List)
                 .map((json) => Product.fromJson(json))
                 .toList();
-          } else {
+          }
+          else {
+            print('Response adalah object tunggal, membungkus ke dalam list');
             return [Product.fromJson(decoded)];
           }
-        } else {
+        }
+        else {
           throw Exception('Format response tidak dikenali: ${decoded.runtimeType}');
         }
       } else if (response.statusCode == 404) {
@@ -68,6 +83,7 @@ class ApiService {
         throw Exception('Gagal memuat produk: ${response.statusCode}');
       }
     } catch (e) {
+      print('❌ Error getProducts: $e');
       throw Exception('Error: $e');
     }
   }
@@ -78,6 +94,8 @@ class ApiService {
         Uri.parse('$baseUrl/products/$id'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 30));
+
+      print('Get Product By ID Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
@@ -148,7 +166,6 @@ class ApiService {
     required String descriptions,
     required int price,
     required int stock,
-    File? imageFile,
     Uint8List? imageBytes,
   }) async {
     try {
@@ -165,6 +182,9 @@ class ApiService {
           'stock': stock,
         }),
       );
+
+      print('Create Product Response Status: ${response.statusCode}');
+      print('Create Product Response Body: ${response.body}');
 
       if (response.statusCode == 201) {
         final decoded = json.decode(response.body);
@@ -184,6 +204,7 @@ class ApiService {
         }
       }
     } catch (e) {
+      print('Create Product Error: $e');
       throw Exception('Error: $e');
     }
   }
@@ -235,6 +256,9 @@ class ApiService {
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
+      print('Update Product Response Status: ${response.statusCode}');
+      print('Update Product Response Body: $responseBody');
+
       if (response.statusCode == 200) {
         final decoded = json.decode(responseBody);
         if (decoded is Map<String, dynamic>) {
@@ -253,42 +277,91 @@ class ApiService {
         }
       }
     } catch (e) {
+      print('Update Product Error: $e');
       throw Exception('Error: $e');
     }
   }
 
-static Future<String> uploadImageBytes(int productId, Uint8List bytes) async {
-  try {
-    if (bytes.length > 2 * 1024 * 1024) {
-      throw Exception('File terlalu besar (max 2MB)');
+  static Future<void> testApiResponse() async {
+    try {
+      print('Testing API Response...');
+      final response = await http.get(
+        Uri.parse('$baseUrl/products'),
+      ).timeout(const Duration(seconds: 10));
+
+      print('Status Code: ${response.statusCode}');
+      print('Response Type: ${response.runtimeType}');
+      print('Response Body: ${response.body}');
+
+      final decoded = json.decode(response.body);
+      print('Decoded Type: ${decoded.runtimeType}');
+
+      if (decoded is List) {
+        print('Response adalah List dengan ${decoded.length} item');
+      } else if (decoded is Map) {
+        print('Response adalah Map dengan keys: ${decoded.keys}');
+        if (decoded.containsKey('data')) {
+          print('Key "data" ditemukan dengan tipe: ${decoded['data'].runtimeType}');
+        }
+      }
+    } catch (e) {
+      print('Error: $e');
     }
-
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/products/$productId/upload-image'),
-    );
-
-    request.headers['Accept'] = 'application/json';
-
-    var multipartFile = http.MultipartFile.fromBytes(
-      'image',
-      bytes,
-      filename: 'product_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      contentType: MediaType('image', 'jpeg'),
-    );
-    request.files.add(multipartFile);
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    if (response.statusCode == 200) {
-      final decoded = json.decode(responseBody);
-      return decoded['image_url'] ?? '';
-    } else {
-      throw Exception('Upload gagal: ${response.statusCode} - $responseBody');
-    }
-  } catch (e) {
-    throw Exception('Gagal upload gambar: $e');
   }
-}
+
+  static Future<String> uploadImage(int productId, File imageFile) async {
+    try {
+      print('========== UPLOAD DEBUG ==========');
+      print('Product ID: $productId');
+      print('File path: ${imageFile.path}');
+
+      if (!await imageFile.exists()) {
+        throw Exception('File tidak ditemukan');
+      }
+
+      final bytes = await imageFile.readAsBytes();
+      final fileSize = bytes.length;
+      print('File size: $fileSize bytes (${(fileSize / 1024).toStringAsFixed(2)} KB)');
+
+      if (fileSize > 2 * 1024 * 1024) {
+        throw Exception('File terlalu besar (max 2MB)');
+      }
+
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/products/$productId/upload-image'),
+      );
+
+      request.headers['Accept'] = 'application/json';
+
+      var multipartFile = http.MultipartFile.fromBytes(
+        'image',
+        bytes,
+        filename: 'product_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        contentType: MediaType('image', 'jpeg'),
+      );
+      request.files.add(multipartFile);
+
+      print('Request URL: ${request.url}');
+      print('Request files count: ${request.files.length}');
+      print('File name: product_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('Upload Response Status: ${response.statusCode}');
+      print('Upload Response Body: $responseBody');
+      print('==================================');
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(responseBody);
+        return decoded['image_url'] ?? '';
+      } else {
+        throw Exception('Upload gagal: ${response.statusCode} - $responseBody');
+      }
+    } catch (e) {
+      print('Upload image error: $e');
+      throw Exception('Gagal upload gambar: $e');
+    }
+  }
 }
